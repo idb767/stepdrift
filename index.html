@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>偏航 StepDrift · 不给你答案，只告诉你从第几步开始偏</title>
+<link rel="stylesheet" href="assets/style.css?v=3">
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- 左栏：输入 -->
+  <aside class="side">
+    <div class="brand">
+      <h1>偏航 <span class="brand-en">StepDrift</span></h1>
+      <p class="tagline">高数 · 线代 · 概率论的推导核查：不给答案，只定位「从第几步开始偏、偏在哪个概念上」。</p>
+    </div>
+
+    <div class="side-block">
+      <h2 class="side-title">样例（点击即出完整结果）</h2>
+      <div id="samples" class="chips"></div>
+    </div>
+
+    <div class="side-block">
+      <div class="modes" role="tablist" aria-label="输入方式">
+        <button id="mode-text" type="button" class="mode is-active" role="tab" aria-selected="true">文字输入</button>
+        <button id="mode-image" type="button" class="mode" role="tab" aria-selected="false">图片对照</button>
+      </div>
+
+      <div id="pane-text" class="pane">
+        <h2 class="side-title">粘贴你的推导</h2>
+        <p class="src-note">输入框是 LaTeX 源码（$...$），结果区与预览区会自动排版成公式。</p>
+        <textarea id="input" rows="10" placeholder="每行一步，可写「第1步 …」，也可不带序号；空行分段同样识别。公式用 $...$ 包裹，例如 $\lim_{x\to 0}|x|=0$。"></textarea>
+        <div id="livePreview" class="preview">
+          <h2 class="preview-title">公式预览 · 下面就是你输入的内容排版后的样子</h2>
+          <div class="preview-body" id="livePreviewBody"></div>
+        </div>
+      </div>
+
+      <div id="pane-image" class="pane hidden">
+        <h2 class="side-title">图片对照录入</h2>
+        <div id="drop" class="drop">
+          <span class="drop-tip" id="drop-tip">把推导图片拖到这里，或</span>
+          <label class="upload">上传图片<input type="file" id="img-file" accept="image/*"></label>
+        </div>
+        <div class="compare">
+          <div class="compare-img" id="img-slot">
+            <p class="compare-empty" id="img-empty">尚未选择图片</p>
+            <img id="img-thumb" class="hidden" alt="已选择的推导图片，点击可放大查看" title="点击放大查看">
+          </div>
+          <div class="compare-text">
+            <textarea id="img-input" rows="10" placeholder="请对照左侧图片录入推导步骤；也可用视觉模型把图片转成 LaTeX 后粘贴到这里"></textarea>
+          </div>
+        </div>
+        <div class="preview">
+          <h2 class="preview-title">公式预览 · 下面就是你输入的内容排版后的样子</h2>
+          <div class="preview-body" id="img-preview-body"></div>
+        </div>
+        <label class="confirm" for="img-confirm">
+          <input type="checkbox" id="img-confirm">
+          <span>我已逐行核对：文字与图片中的推导一致</span>
+        </label>
+        <p class="confirm-note">未核对前不能开始判定；判定只使用你在右侧录入并确认过的文字。</p>
+      </div>
+
+      <p id="input-hint" class="hint"></p>
+      <button id="btn-run" type="button" class="btn-primary">开始判定</button>
+      <div class="side-actions">
+        <label class="upload">
+          上传 .txt 推导文件
+          <input type="file" id="file" accept=".txt,text/plain">
+        </label>
+        <button id="btn-boundary" type="button" class="btn-link">判定边界</button>
+      </div>
+    </div>
+
+    <p class="side-foot">所有判定在本机完成：固定种子抽样 + 规则库模板，可复核、可复现。</p>
+  </aside>
+
+  <!-- 右栏：三层结果 -->
+  <main class="main">
+    <div id="empty-state" class="empty">
+      <p class="empty-big">不给你答案，<br>只告诉你从第几步开始偏。</p>
+      <ol class="empty-layers">
+        <li><strong>步骤指纹</strong>：逐步标注通过 / 不成立 / 存疑 / 未判定，并给出每步的核查记录。</li>
+        <li><strong>偏航点定位</strong>：指出出错的那一步，写明缺的条件、数字证据与对应定理卡片。</li>
+        <li><strong>错因归档</strong>：把错误归入固定七类，在本机累计，看清自己反复偏在哪。</li>
+      </ol>
+      <button id="btn-demo" type="button" class="btn-primary">用样例跑一遍</button>
+      <p class="empty-note">拿不准的步骤一律标「未判定」，不猜、不凑。</p>
+    </div>
+    <div id="results" class="hidden"></div>
+  </main>
+</div>
+
+<!-- 判定边界弹窗 -->
+<div id="boundary-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="判定边界">
+  <div class="modal-card">
+    <h2>判定边界</h2>
+    <h3>本工具覆盖的检查</h3>
+    <ul>
+      <li><strong>代数等价</strong>：手写解析器 + 固定种子 12 点抽样，只对纯算术表达式成立。</li>
+      <li><strong>极限声称</strong>：识别 lim(x→a) 与 x→∞，左右各 6 点抽样，核验双侧存在性、相等性与声称值。</li>
+      <li><strong>五类概念规则</strong>：①连续 ⇒ 可导的方向反转；②洛必达前提未验证；③由导数之比无极限反推原极限不存在；④A 不可逆 ⇒ 无解；⑤「恰有一人」写成 A∪B。触发条件带方向与前提识别：「可导 ⇒ 连续」、洛必达后本步极限抽样收敛、以及含补事件的互斥分解，都不算偏航。</li>
+      <li><strong>结论冲突</strong>：同一推理链上「无解 ⇄ 无穷多解」等互斥结论单独标出。</li>
+    </ul>
+    <h3>本工具不覆盖</h3>
+    <ul>
+      <li>矩阵、事件等对象表达式的具体计算（如 rank 的求解过程、行列式求值）。</li>
+      <li>几何证明、积分技巧、多变量与抽象证明。</li>
+      <li>题意理解是否正确、最终答案是否算完。</li>
+    </ul>
+    <h3>为什么会有「未判定」</h3>
+    <p>未命中任何可复核规则的步骤，本工具没有证据下结论，因此标「未判定」而不是「通过」。未判定 ≠ 正确，只表示超出判定边界；「受上游影响」表示该步引用了已判定不成立的结论，不单独计错。</p>
+    <h3>关于输入框</h3>
+    <p>输入框显示源码是数学工具的正常形态，不是乱码。</p>
+    <h3>关于图片对照</h3>
+    <p>图片仅作对照参考，本工具不识别手写公式。判定对象是你在右侧录入并确认过的文字——认错的符号不会被悄悄带进判定。</p>
+    <button id="btn-close-boundary" type="button" class="btn-primary">知道了</button>
+  </div>
+</div>
+
+<!-- 图片放大查看 -->
+<div id="img-viewer" class="viewer hidden" role="dialog" aria-modal="true" aria-label="图片放大查看">
+  <p class="viewer-tip">对照右侧录入的文字逐行核对 · 点击任意处关闭</p>
+  <img id="img-large" alt="推导图片放大视图">
+</div>
+
+<script src="js/parser.js"></script>
+<script src="js/sampling.js"></script>
+<script src="js/rules.js?v=2"></script>
+<script src="js/engine.js"></script>
+<script src="js/latex.js?v=3"></script>
+<script src="js/archive.js"></script>
+<script src="js/render.js"></script>
+<script src="js/samples.js"></script>
+<script src="js/preview.js?v=2"></script>
+<script src="js/inputmode.js?v=2"></script>
+<script src="js/app.js?v=3"></script>
+</body>
+</html>
